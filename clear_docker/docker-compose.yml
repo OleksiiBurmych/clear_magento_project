@@ -1,0 +1,77 @@
+services:
+  php:
+    build:
+      context: ./php
+    container_name: magento_php
+    user: "82:82"
+    volumes:
+      - ../:/var/www/html:cached
+      - ./php/conf.d:/usr/local/etc/php/conf.d
+    networks:
+      - magento_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: magento_nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ../:/var/www/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/includes:/etc/nginx/includes 
+    depends_on:
+      - php
+    networks:
+      - magento_net
+
+  mysql:
+    image: mariadb:10.5
+    container_name: magento_mysql
+    restart: always
+    env_file:
+      - .env/mysql.env
+    volumes:
+      - magento_mysql_data:/var/lib/mysql
+    networks:
+      - magento_net
+
+  redis:
+    image: redis:alpine #optional
+    container_name: magento_redis
+    networks:
+      - magento_net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+    container_name: magento_elastic
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    networks:
+      - magento_net
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine #optional
+    container_name: magento_rabbit
+    ports:
+      - "15672:15672"
+    networks:
+      - magento_net
+
+  varnish:
+    image: varnish:stable #optional
+    container_name: magento_varnish
+    ports:
+      - "8081:80"
+    volumes:
+      - ./varnish/default.vcl:/etc/varnish/default.vcl
+    depends_on:
+      - nginx
+    networks:
+      - magento_net
+
+volumes:
+  magento_mysql_data:
+
+networks:
+  magento_net:
