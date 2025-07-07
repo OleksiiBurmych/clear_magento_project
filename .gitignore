@@ -70,7 +70,7 @@ atlassian*
 /vendor/*
 !/vendor/.htaccess
 
-docker/.env/
+docker/.env/*
 !docker/.env/*.example
 /generated/*
 !/generated/.htaccess
