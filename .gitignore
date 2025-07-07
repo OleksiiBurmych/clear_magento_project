@@ -69,6 +69,9 @@ atlassian*
 !/var/.htaccess
 /vendor/*
 !/vendor/.htaccess
+
+docker/.env/*
+!docker/.env/*.example
 /generated/*
 !/generated/.htaccess
 .DS_Store
