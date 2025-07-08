@@ -1,0 +1,60 @@
+# ------------------------------------------
+# 🏗️ Build stage
+# ------------------------------------------
+FROM php:8.1-fpm-alpine AS build
+
+# Встановлюємо залежності для компіляції розширень, включно з libsodium-dev
+RUN apk add --no-cache --virtual .build-deps \
+        $PHPIZE_DEPS \
+        icu-dev libxml2-dev libzip-dev \
+        mariadb-dev rabbitmq-c-dev linux-headers \
+        libpng-dev libjpeg-turbo-dev libwebp-dev libxpm-dev freetype-dev \
+        libsodium-dev \
+    && apk add --no-cache \
+        git unzip curl bash zip libsodium
+
+# Встановлюємо PHP-розширення (додано sodium)
+RUN docker-php-ext-configure gd \
+        --with-freetype \
+        --with-jpeg \
+        --with-webp \
+        --with-xpm \
+    && docker-php-ext-install -j$(nproc) \
+        pdo_mysql zip intl soap xml opcache gd sodium
+
+# Встановлюємо pecl-пакети
+RUN pecl install redis amqp \
+    && docker-php-ext-enable redis amqp sodium
+
+# Встановлюємо Composer (останню версію)
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Копіюємо код проєкту
+WORKDIR /app
+COPY . .
+
+# Встановлюємо продакшн-залежності
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+# ------------------------------------------
+# 🚀 Runtime stage
+# ------------------------------------------
+FROM php:8.1-fpm-alpine
+
+# Встановлюємо тільки потрібні бібліотеки, включно з libsodium
+RUN apk add --no-cache \
+        bash curl git libpng libjpeg-turbo libwebp libxpm freetype icu libxml2 libzip mariadb-connector-c rabbitmq-c libsodium
+
+# Копіюємо зібрані розширення та конфігурації
+COPY --from=build /usr/local/lib/php/extensions /usr/local/lib/php/extensions
+COPY --from=build /usr/local/etc/php/conf.d /usr/local/etc/php/conf.d
+
+# Копіюємо код і встановлені залежності
+WORKDIR /var/www/html
+COPY --from=build /app .
+
+# Увімкнення необхідних розширень
+RUN docker-php-ext-enable redis amqp sodium
+
+CMD ["php-fpm"]
+
